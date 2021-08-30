@@ -160,7 +160,7 @@ CHAR RecoveryCode(LPVOID APIAddress, BYTE* RecoverData) {
 	{
 		printf("Ð´ÄÚ´æÊ§°Ü\n", GetLastError());
 		return -1;
-	}
+	}    
 	return 0;
 }
 
