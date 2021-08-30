@@ -131,7 +131,38 @@ extern "C" __declspec(dllexport) HHOOK StartHook(CHAR hookType, DWORD threadId) 
 extern "C" __declspec(dllexport) bool UnHook(HHOOK hHook) {/*卸载一个钩子函数*/
 	return UnhookWindowsHookEx(hHook);
 }
+BYTE RecoveryMemory[MemoryHookLength];/*恢复的数据只是临时的缓存*/
+BYTE RecoveryMemoryMyTextOut[MemoryHookLength];
+BYTE* MemoryHook(LPVOID APIAddress,/*我们要勾住的API地址*/ LPVOID jmpAddress/*我们跳转的位置*/) {
 
+	DWORD oldProtectAttiute;
+	if (VirtualProtectEx(GetCurrentProcess(), APIAddress, MemoryHookLength, PAGE_EXECUTE_READWRITE, &oldProtectAttiute))//修改地址的保护属性
+	{
+		if (!ReadProcessMemory(GetCurrentProcess(), APIAddress, RecoveryMemory, MemoryHookLength, NULL)) {//读取内存地址信息
+			printf("读取内存失败\n", GetLastError());
+		}
+		CHAR Shellcode[12];
+		ZeroMemory(Shellcode, 12);
+		Shellcode[0] = 0xE9;/*jmp跳转*/
+		*(DWORD*)(Shellcode + 1) = (DWORD)APIAddress - (DWORD)jmpAddress - 5;/*地址跳转公式*/
+		if (!WriteProcessMemory(GetCurrentProcess(), APIAddress, Shellcode, MemoryHookLength, NULL))/*写内存数据*/
+		{
+			printf("写内存失败\n", GetLastError());
+		}
+	}
+	VirtualProtectEx(GetCurrentProcess(), APIAddress, MemoryHookLength, oldProtectAttiute, &oldProtectAttiute);//恢复之前的保护属性
+
+	return RecoveryMemory;
+}
+/*恢复地址函数*/
+CHAR RecoveryCode(LPVOID APIAddress, BYTE* RecoverData) {
+	if (!WriteProcessMemory(GetCurrentProcess(), APIAddress, RecoverData, MemoryHookLength, NULL))/*写内存数据*/
+	{
+		printf("写内存失败\n", GetLastError());
+		return -1;
+	}
+	return 0;
+}
 
 
 
@@ -148,38 +179,7 @@ BOOL WINAPI MyTextOut(_In_ HDC hdc, _In_ int x, _In_ int y, _In_reads_(c)LPCWSTR
 }
 
 
-BYTE RecoveryMemory[MemoryHookLength];/*恢复的数据只是临时的缓存*/
-BYTE RecoveryMemoryMyTextOut[MemoryHookLength];
-BYTE* MemoryHook(LPVOID APIAddress,/*我们要勾住的API地址*/ LPVOID jmpAddress/*我们跳转的位置*/) {
-	
-	DWORD oldProtectAttiute;
-	if (VirtualProtectEx(GetCurrentProcess(), APIAddress, MemoryHookLength, PAGE_EXECUTE_READWRITE, &oldProtectAttiute))//修改地址的保护属性
-	{
-		if (!ReadProcessMemory(GetCurrentProcess(), APIAddress, RecoveryMemory, MemoryHookLength, NULL)) {//读取内存地址信息
-			printf("读取内存失败\n",GetLastError());
-		}
-		CHAR Shellcode[12];
-		ZeroMemory(Shellcode, 12);
-		Shellcode[0] = 0xE9;/*jmp跳转*/
-		*(DWORD*)(Shellcode + 1) = (DWORD)APIAddress - (DWORD)jmpAddress - 5;/*地址跳转公式*/
-		if (!WriteProcessMemory(GetCurrentProcess(), APIAddress, Shellcode, MemoryHookLength, NULL))/*写内存数据*/ 
-		{
-			printf("写内存失败\n", GetLastError());
-		}
-	}
-	VirtualProtectEx(GetCurrentProcess(), APIAddress, MemoryHookLength, oldProtectAttiute, &oldProtectAttiute);//恢复之前的保护属性
 
-	return RecoveryMemory;
-}
-/*恢复地址函数*/
-CHAR RecoveryCode(LPVOID APIAddress, BYTE *RecoverData) {
-	if (!WriteProcessMemory(GetCurrentProcess(), APIAddress, RecoverData, MemoryHookLength, NULL))/*写内存数据*/
-	{
-		printf("写内存失败\n", GetLastError());
-		return -1;
-	}
-	return 0;
-}
 BOOL APIENTRY DllMain(HMODULE hMoudle,/*当前DLL句柄*/DWORD call_Reason,/*调用原因*/ LPCVOID lpReserved) {
 
 	switch (call_Reason)

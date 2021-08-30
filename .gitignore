@@ -6,7 +6,7 @@
 *.lo
 *.o
 *.obj
-
+*/Debug
 # Precompiled Headers
 *.gch
 *.pch
